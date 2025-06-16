@@ -41,3 +41,10 @@ jobs:
                 name: summary_statistics
                 path: |
                     velocity_summary_statistics.png
+
+            - name: Upload Median Horizontal Velocity as Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                name: summary_statistics
+                path: |
+                    median_horizontal_velocity_magnitude.tif
