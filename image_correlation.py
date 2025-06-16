@@ -55,7 +55,7 @@ def download_s2(img1_date, img2_date, aoi):
 
     return img1_ds, img2_ds 
 
-def run_autoRIFT(img1, img2, skip_x=3, skip_y=3, min_x_chip=16, max_x_chip=64,
+def run_autoRIFT(img1, img2, skip_x=2, skip_y=2, min_x_chip=16, max_x_chip=64,
                  preproc_filter_width=3, mpflag=4, search_limit_x=30, search_limit_y=30):
     '''
     Configure and run autoRIFT feature tracking with Sentinel-2 data for large mountain glaciers
@@ -180,7 +180,7 @@ def main():
     img2 = img2_ds.B08.squeeze().values
     
     # scale search limit with temporal baseline assuming max velocity 1000 m/yr (100 px/yr)
-    search_limit_x = search_limit_y = round(((((img2_ds.time.isel(time=0) - img1_ds.time.isel(time=0)).dt.days)*100)/365.25).item())
+    search_limit_x = search_limit_y = round(((((img2_ds.time.isel(time=0) - img1_ds.time.isel(time=0)).dt.days)*60)/365.25).item())
     
     # run autoRIFT feature tracking
     obj = run_autoRIFT(img1, img2, search_limit_x=search_limit_x, search_limit_y=search_limit_y)
