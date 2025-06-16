@@ -11,5 +11,6 @@ dependencies:
   - netcdf4
   - autorift
   - pystac-client
-  - stackstac
+  - odc-stac
+  - planetary-computer
   - dask

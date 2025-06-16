@@ -1,13 +1,16 @@
 import xarray as xr
+import rasterio
+import rioxarray
 import os
-import pystac
 import pystac_client
-import stackstac
-from dask.distributed import Client
-import dask
 import json
 import pandas as pd
 import argparse
+import odc.stac
+import planetary_computer
+import geopandas as gpd
+from shapely.geometry import shape
+import numpy as np
 
 def get_parser():
     parser = argparse.ArgumentParser(description="Search for Sentinel-2 images")
@@ -22,7 +25,7 @@ def main():
     args = parser.parse_args()
     
     # hardcode bbox for now
-    bbox = {
+    aoi = {
         "type": "Polygon",
         "coordinates": [
             [[-121.85308124466923,46.94373134954458],
@@ -31,47 +34,58 @@ def main():
             [-121.63845508457872,46.94373134954458],
             [-121.85308124466923,46.94373134954458]]]
     }
+
+    aoi_gpd = gpd.GeoDataFrame({'geometry':[shape(aoi)]}).set_crs(crs="EPSG:4326")
+    crs = aoi_gpd.estimate_utm_crs()
     
-    # Use the api from element84 to query the data
-    URL = "https://earth-search.aws.element84.com/v1"
-    catalog = pystac_client.Client.open(URL)
-    
-    search = catalog.search(
+    stac = pystac_client.Client.open(
+    "https://planetarycomputer.microsoft.com/api/stac/v1",
+    modifier=planetary_computer.sign_inplace)
+
+    # search planetary computer
+    search = stac.search(
+        intersects=aoi,
         collections=["sentinel-2-l2a"],
-        intersects=bbox,
-        query={"eo:cloud_cover": {"lt": float(args.cloud_cover)}}
-    )
-    
-    # Check how many items were returned
+        query={"eo:cloud_cover": {"lt": float(args.cloud_cover)}})
+
     items = search.item_collection()
-    print(f"Returned {len(items)} Items")
     
-    # create xarray dataset without loading data
-    sentinel2_stack = stackstac.stack(items)
+    s2_ds = odc.stac.load(items,chunks={"x": 2048, "y": 2048},
+                          bbox=aoi_gpd.total_bounds,
+                          groupby='solar_day').where(lambda x: x > 0, other=np.nan)
+    print(f"Returned {len(s2_ds.time)} acquisitions")
+    
+    # calculate number of valid pixels in each image
+    total_pixels = len(s2_ds.y)*len(s2_ds.x)
+    nan_count = (~np.isnan(s2_ds.B08)).sum(dim=['x', 'y']).compute()
+    # keep only pixels with 90% or more valid pixels
+    s2_ds = s2_ds.where(nan_count >= total_pixels*0.9, drop=True)
+
     # filter to specified month range
-    sentinel2_stack_snowoff = sentinel2_stack.where((sentinel2_stack.time.dt.month >= int(args.start_month)) & (sentinel2_stack.time.dt.month <= int(args.stop_month)), drop=True)
-    
+    s2_ds_snowoff = s2_ds.where((s2_ds.time.dt.month >= int(args.start_month)) & (s2_ds.time.dt.month <= int(args.stop_month)), drop=True)
+
     # select first image of each month
-    period_index = pd.PeriodIndex(sentinel2_stack_snowoff['time'].values, freq='M')
-    sentinel2_stack_snowoff.coords['year_month'] = ('time', period_index)
-    first_image_indices = sentinel2_stack_snowoff.groupby('year_month').apply(lambda x: x.isel(time=0))
-    
-    product_names = first_image_indices['s2:product_uri'].values.tolist()
-    print('\n'.join(product_names))
+    period_index = pd.PeriodIndex(s2_ds_snowoff['time'].values, freq='M')
+    s2_ds_snowoff.coords['year_month'] = ('time', period_index)
+    first_image_indices = s2_ds_snowoff.groupby('year_month').apply(lambda x: x.isel(time=0))
+
+    # get dates of acceptable images
+    image_dates = first_image_indices.time.dt.strftime('%Y-%m-%d').values.tolist()
+    print('\n'.join(image_dates))
     
     # Create Matrix Job Mapping (JSON Array)
     pairs = []
-    for r in range(len(product_names) - int(args.npairs)):
+    for r in range(len(image_dates) - int(args.npairs)):
         for s in range(1, int(args.npairs) + 1 ):
-            img1_product_name = product_names[r]
-            img2_product_name = product_names[r+s]
-            shortname = f'{img1_product_name[11:19]}_{img2_product_name[11:19]}'
-            pairs.append({'img1_product_name': img1_product_name, 'img2_product_name': img2_product_name, 'name':shortname})
+            img1_date = image_dates[r]
+            img2_date = image_dates[r+s]
+            shortname = f'{img1_date}_{img2_date}'
+            pairs.append({'img1_date': img1_date, 'img2_date': img2_date, 'name':shortname})
     matrixJSON = f'{{"include":{json.dumps(pairs)}}}'
     print(f'number of image pairs: {len(pairs)}')
     
     with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-        print(f'IMAGE_DATES={product_names}', file=f)
+        print(f'IMAGE_DATES={image_dates}', file=f)
         print(f'MATRIX_PARAMS_COMBINATIONS={matrixJSON}', file=f)
 
 if __name__ == "__main__":

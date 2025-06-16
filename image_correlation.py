@@ -7,50 +7,51 @@ import numpy as np
 import os
 from autoRIFT import autoRIFT
 from scipy.interpolate import interpn
-import pystac
 import pystac_client
-import stackstac
-from dask.distributed import Client
+import odc.stac
+import planetary_computer
 import geopandas as gpd
 from shapely.geometry import shape
-import dask
 import warnings
 import argparse
+import numpy as np
 
 # silence some warnings from stackstac and autoRIFT
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
-def download_s2(img1_product_name, img2_product_name, bbox):
+def download_s2(img1_date, img2_date, aoi):
     '''
-    Download a pair of Sentinel-2 images acquired on given dates over a given bounding box
+    Download a pair of Sentinel-2 images acquired on given dates over a given area of interest
     '''
-    # We use the api from element84 to query the data
-    URL = "https://earth-search.aws.element84.com/v1"
-    catalog = pystac_client.Client.open(URL)
+    aoi_gpd = gpd.GeoDataFrame({'geometry':[shape(aoi)]}).set_crs(crs="EPSG:4326")
+    crs = aoi_gpd.estimate_utm_crs()
+    
+    stac = pystac_client.Client.open(
+    "https://planetarycomputer.microsoft.com/api/stac/v1",
+    modifier=planetary_computer.sign_inplace)
 
-    search = catalog.search(
-    collections=["sentinel-2-l2a"],
-    query=[f's2:product_uri={img1_product_name}'])
+    search = stac.search(intersects=aoi,
+                         datetime=img1_date,
+                         collections=["sentinel-2-l2a"])
     
     img1_items = search.item_collection()
-    img1_full = stackstac.stack(img1_items)
 
-    search = catalog.search(
-    collections=["sentinel-2-l2a"],
-    query=[f's2:product_uri={img2_product_name}'])
-
-    # Check how many items were returned
-    img2_items = search.item_collection()
-    img2_full = stackstac.stack(img2_items)
-
-    aoi = gpd.GeoDataFrame({'geometry':[shape(bbox)]})
-    # crop images to aoi
-    img1_clipped = img1_full.rio.clip_box(*aoi.total_bounds,crs=4326) 
-    img2_clipped = img2_full.rio.clip_box(*aoi.total_bounds,crs=4326)
+    img1_ds = odc.stac.load(img1_items,
+                            chunks={"x": 2048, "y": 2048},
+                            bbox=aoi_gpd.total_bounds,
+                            groupby='solar_day').where(lambda x: x > 0, other=np.nan).squeeze()
     
-    img1_ds = img1_clipped.to_dataset(dim='band')
-    img2_ds = img2_clipped.to_dataset(dim='band')
+    search = stac.search(intersects=aoi,
+                         datetime=img2_date,
+                         collections=["sentinel-2-l2a"])
+    
+    img2_items = search.item_collection()
+
+    img2_ds = odc.stac.load(img2_items,
+                            chunks={"x": 2048, "y": 2048},
+                            bbox=aoi_gpd.total_bounds,
+                            groupby='solar_day').where(lambda x: x > 0, other=np.nan).squeeze()
 
     return img1_ds, img2_ds 
 
@@ -58,8 +59,7 @@ def run_autoRIFT(img1, img2, skip_x=3, skip_y=3, min_x_chip=16, max_x_chip=64,
                  preproc_filter_width=3, mpflag=4, search_limit_x=30, search_limit_y=30):
     '''
     Configure and run autoRIFT feature tracking with Sentinel-2 data for large mountain glaciers
-    '''
-        
+    ''' 
     obj = autoRIFT()
     obj.MultiThread = mpflag
 
@@ -151,8 +151,8 @@ def prep_outputs(obj, img1_ds, img2_ds):
 
 def get_parser():
     parser = argparse.ArgumentParser(description="Run autoRIFT to find pixel offsets for two Sentinel-2 images")
-    parser.add_argument("img1_product_name", type=str, help="product name of first Sentinel-2 image")
-    parser.add_argument("img2_product_name", type=str, help="product name of second Sentinel-2 image")
+    parser.add_argument("img1_date", type=str, help="date of first Sentinel-2 image ('YYYY-mm-dd')")
+    parser.add_argument("img2_date", type=str, help="date of second Sentinel-2 image ('YYYY-mm-dd')")
     return parser
 
 def main():
@@ -160,7 +160,7 @@ def main():
     args = parser.parse_args()
 
     # hardcoding a bbox for now
-    bbox = {
+    aoi = {
     "type": "Polygon",
     "coordinates": [
           [
@@ -174,10 +174,10 @@ def main():
     }
 
     # download Sentinel-2 images
-    img1_ds, img2_ds = download_s2(args.img1_product_name, args.img2_product_name, bbox)
+    img1_ds, img2_ds = download_s2(args.img1_date, args.img2_date, aoi)
     # grab near infrared band only
-    img1 = img1_ds.nir.squeeze().values
-    img2 = img2_ds.nir.squeeze().values
+    img1 = img1_ds.B08.values
+    img2 = img2_ds.B08.values
     
     # scale search limit with temporal baseline assuming max velocity 1000 m/yr (100 px/yr)
     search_limit_x = search_limit_y = round(((((img2_ds.time.isel(time=0) - img1_ds.time.isel(time=0)).dt.days)*100)/365.25).item())
@@ -188,7 +188,7 @@ def main():
     ds = prep_outputs(obj, img1_ds, img2_ds)
 
     # write out velocity to tif
-    ds.veloc_horizontal.rio.to_raster(f'S2_{args.img1_product_name[11:19]}_{args.img2_product_name[11:19]}_horizontal_velocity.tif')
+ds.veloc_horizontal.rio.to_raster(f'S2_{args.img1_date}_{args.img2_date}_horizontal_velocity.tif')
 
 if __name__ == "__main__":
    main()
