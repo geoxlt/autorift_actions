@@ -73,11 +73,11 @@ def main():
     for r in range(len(s2_ds_snowoff.time) - int(args.npairs)):
         for s in range(1, int(args.npairs) + 1 ):
             t_baseline = s2_ds_snowoff.isel(time=r+s).time - s2_ds_snowoff.isel(time=r).time
-                if t_baseline.dt.days <= 100: #t baseline threshold
-                    img1_date = image_dates[r]
-                    img2_date = image_dates[r+s]
-                    shortname = f'{img1_date}_{img2_date}'
-                    pairs.append({'img1_date': img1_date, 'img2_date': img2_date, 'name':shortname})
+            if t_baseline.dt.days <= 100: #t baseline threshold
+                img1_date = image_dates[r]
+                img2_date = image_dates[r+s]
+                shortname = f'{img1_date}_{img2_date}'
+                pairs.append({'img1_date': img1_date, 'img2_date': img2_date, 'name':shortname})
     matrixJSON = f'{{"include":{json.dumps(pairs)}}}'
     print(f'number of image pairs: {len(pairs)}')
     
