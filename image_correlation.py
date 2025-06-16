@@ -40,7 +40,7 @@ def download_s2(img1_date, img2_date, aoi):
     img1_ds = odc.stac.load(img1_items,
                             chunks={"x": 2048, "y": 2048},
                             bbox=aoi_gpd.total_bounds,
-                            groupby='solar_day').where(lambda x: x > 0, other=np.nan).squeeze()
+                            groupby='solar_day').where(lambda x: x > 0, other=np.nan)
     
     search = stac.search(intersects=aoi,
                          datetime=img2_date,
@@ -51,7 +51,7 @@ def download_s2(img1_date, img2_date, aoi):
     img2_ds = odc.stac.load(img2_items,
                             chunks={"x": 2048, "y": 2048},
                             bbox=aoi_gpd.total_bounds,
-                            groupby='solar_day').where(lambda x: x > 0, other=np.nan).squeeze()
+                            groupby='solar_day').where(lambda x: x > 0, other=np.nan)
 
     return img1_ds, img2_ds 
 
@@ -176,8 +176,8 @@ def main():
     # download Sentinel-2 images
     img1_ds, img2_ds = download_s2(args.img1_date, args.img2_date, aoi)
     # grab near infrared band only
-    img1 = img1_ds.B08.values
-    img2 = img2_ds.B08.values
+    img1 = img1_ds.B08.squeeze().values
+    img2 = img2_ds.B08.squeeze().values
     
     # scale search limit with temporal baseline assuming max velocity 1000 m/yr (100 px/yr)
     search_limit_x = search_limit_y = round(((((img2_ds.time.isel(time=0) - img1_ds.time.isel(time=0)).dt.days)*100)/365.25).item())
