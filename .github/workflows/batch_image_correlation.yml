@@ -63,8 +63,8 @@ jobs:
     name: ${{ matrix.name }}
     uses: ./.github/workflows/image_correlation_pair.yml
     with:
-      img1_product_name: ${{ matrix.img1_product_name }}
-      img2_product_name: ${{ matrix.img2_product_name }} 
+      img1_date: ${{ matrix.img1_date }}
+      img2_date: ${{ matrix.img2_date }} 
       workflow_name: ${{ matrix.name }}
 
   summary_statistics:
