@@ -53,11 +53,11 @@ jobs:
                 cache-environment: true
                 environment-file: environment.yml
 
-            - name: Modify autoRIFT Package
-            # current release has deprecated numpy functions https://github.com/nasa-jpl/autoRIFT/issues/97
-              run: |
-                git clone https://github.com/gbrencher/autoRIFT.git
-                cp -f autoRIFT/geo_autoRIFT/autoRIFT/autoRIFT.py /home/runner/micromamba/envs/image-correlation/lib/python3.12/site-packages/autoRIFT/
+            # - name: Modify autoRIFT Package
+            # # current release has deprecated numpy functions https://github.com/nasa-jpl/autoRIFT/issues/97
+            #   run: |
+            #     git clone https://github.com/gbrencher/autoRIFT.git
+            #     cp -f autoRIFT/geo_autoRIFT/autoRIFT/autoRIFT.py /home/runner/micromamba/envs/image-correlation/lib/python3.12/site-packages/autoRIFT/
                 
             - name: Download Data and Run autoRIFT Software
               run: |
