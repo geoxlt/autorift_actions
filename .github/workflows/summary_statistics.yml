@@ -22,22 +22,22 @@ jobs:
               uses: mamba-org/setup-micromamba@v1
               with:
                 cache-environment: true
-                environment-file: glacier_image_correlation/environment.yml
+                environment-file: environment.yml
                 environment-name: image-correlation
 
             - name: Download Velocity Map Artifacts
               uses: actions/download-artifact@v4
               with:
-                  path: glacier_image_correlation/
+                  path:
                   merge-multiple: true
                 
             - name: Compute Summary Statistics
               run: |
-                python glacier_image_correlation/summary_statistics.py
+                python summary_statistics.py
 
             - name: Upload Summary Statistics Figure as Artifact
               uses: actions/upload-artifact@v4
               with:
                 name: summary_statistics
                 path: |
-                    glacier_image_correlation/velocity_summary_statistics.png
+                    velocity_summary_statistics.png
