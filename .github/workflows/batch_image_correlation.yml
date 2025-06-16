@@ -27,7 +27,7 @@ on:
             required: true
             description: number of pairs per image
             default: '1'
-            options: ['3','2','1']
+            options: ['5', '4', '3','2','1']
             
 jobs:
   # The output of this job is a JSON mapping for a matrix job
