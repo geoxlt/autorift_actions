@@ -47,12 +47,12 @@ jobs:
         uses: mamba-org/setup-micromamba@v1
         with:
           cache-environment: true
-          environment-file: glacier_image_correlation/environment.yml
+          environment-file: environment.yml
 
       - name: Search aws for S2 Imagery
         id: S2_search
         run: | 
-          python glacier_image_correlation/s2_search.py ${{ inputs.cloud_cover }} ${{ inputs.start_month }} ${{ inputs.stop_month }} ${{ inputs.npairs }}
+          python s2_search.py ${{ inputs.cloud_cover }} ${{ inputs.start_month }} ${{ inputs.stop_month }} ${{ inputs.npairs }}
 
   # A matrix job that calls a reuseable workflow
   autoRIFT:
