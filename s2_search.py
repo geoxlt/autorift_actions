@@ -64,23 +64,20 @@ def main():
     # filter to specified month range
     s2_ds_snowoff = s2_ds.where((s2_ds.time.dt.month >= int(args.start_month)) & (s2_ds.time.dt.month <= int(args.stop_month)), drop=True)
 
-    # select first image of each month
-    period_index = pd.PeriodIndex(s2_ds_snowoff['time'].values, freq='M')
-    s2_ds_snowoff.coords['year_month'] = ('time', period_index)
-    first_image_indices = s2_ds_snowoff.groupby('year_month').apply(lambda x: x.isel(time=0))
-
     # get dates of acceptable images
-    image_dates = first_image_indices.time.dt.strftime('%Y-%m-%d').values.tolist()
+    image_dates = s2_ds_snowoff.time.dt.strftime('%Y-%m-%d').values.tolist()
     print('\n'.join(image_dates))
     
     # Create Matrix Job Mapping (JSON Array)
     pairs = []
-    for r in range(len(image_dates) - int(args.npairs)):
+    for r in range(len(s2_ds_snowoff.time) - int(args.npairs)):
         for s in range(1, int(args.npairs) + 1 ):
-            img1_date = image_dates[r]
-            img2_date = image_dates[r+s]
-            shortname = f'{img1_date}_{img2_date}'
-            pairs.append({'img1_date': img1_date, 'img2_date': img2_date, 'name':shortname})
+            t_baseline = s2_ds_snowoff.isel(time=r+s).time - s2_ds_snowoff.isel(time=r).time
+                if t_baseline.dt.days <= 100: #t baseline threshold
+                    img1_date = image_dates[r]
+                    img2_date = image_dates[r+s]
+                    shortname = f'{img1_date}_{img2_date}'
+                    pairs.append({'img1_date': img1_date, 'img2_date': img2_date, 'name':shortname})
     matrixJSON = f'{{"include":{json.dumps(pairs)}}}'
     print(f'number of image pairs: {len(pairs)}')
     
