@@ -50,7 +50,7 @@ def combine_ds(data_dir, file_type='horizontal_velocity'):
 
 def main():
     # read in tifs
-    veloc_ds = combine_ds(data_dir='glacier_image_correlation', file_type='horizontal_velocity')
+    veloc_ds = combine_ds(data_dir='.', file_type='horizontal_velocity')
     # calculate and save median velocity
     veloc_da_median = veloc_ds.horizontal_velocity.median(dim='dates')
     veloc_da_median.rio.to_raster('median_horizontal_velocity_magnitude.tif')
