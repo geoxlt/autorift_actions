@@ -48,7 +48,7 @@ jobs:
               uses: actions/checkout@v4
 
             - name: Install Conda environment with Micromamba
-              uses: mamba-org/setup-micromamba@v1
+              uses: mamba-org/setup-micromamba@v2
               with:
                 cache-environment: true
                 environment-file: environment.yml
@@ -57,11 +57,11 @@ jobs:
             # current release has deprecated numpy functions https://github.com/nasa-jpl/autoRIFT/issues/97
               run: |
                 git clone https://github.com/gbrencher/autoRIFT.git
-                cp -f autoRIFT/geo_autoRIFT/autoRIFT/autoRIFT.py /home/runner/micromamba/envs/image-correlation/lib/python3.12/site-packages/autoRIFT/
+                cp -f autoRIFT/geo_autoRIFT/autoRIFT/autoRIFT.py /home/runner/micromamba/envs/image-correlation/lib/python3.13/site-packages/autoRIFT/
                 
             - name: Download Data and Run autoRIFT Software
               run: |
-                python image_correlation.py ${{ inputs.img1_date }} ${{ inputs.img2_date }}
+                python -u image_correlation.py ${{ inputs.img1_date }} ${{ inputs.img2_date }}
 
             - name: Upload Velocity Map as Artifact
               uses: actions/upload-artifact@v4
