@@ -1,0 +1,73 @@
+# Batch process many image pairs
+name: batch_image_correlation
+run-name: batch image correlation ${{ inputs.npairs }} connections
+
+on:
+  workflow_dispatch:
+    inputs:
+        cloud_cover:
+            type: string
+            required: true
+            description: percent cloud cover allowed in images (0-100)
+            default: '10'
+        start_month:
+            type: choice
+            required: true
+            description: first month of year to search for images
+            default: '6'
+            options: ['1','2','3','4','5','6','7','8','9','10','11','12']
+        stop_month:
+            type: choice
+            required: true
+            description: last month of year to search for images
+            default: '9'
+            options: ['1','2','3','4','5','6','7','8','9','10','11','12']
+        npairs:
+            type: choice
+            required: true
+            description: number of pairs per image
+            default: '1'
+            options: ['3','2','1']
+            
+jobs:
+  # The output of this job is a JSON mapping for a matrix job
+  S2_search:
+    runs-on: ubuntu-latest
+    outputs:
+      IMG_IDS: ${{ steps.S2_search.outputs.IMAGE_DATES }}
+      MATRIX: ${{ steps.S2_search.outputs.MATRIX_PARAMS_COMBINATIONS }}
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Conda environment with Micromamba
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          cache-environment: true
+          environment-file: glacier_image_correlation/environment.yml
+
+      - name: Search aws for S2 Imagery
+        id: S2_search
+        run: | 
+          python glacier_image_correlation/s2_search.py ${{ inputs.cloud_cover }} ${{ inputs.start_month }} ${{ inputs.stop_month }} ${{ inputs.npairs }}
+
+  # A matrix job that calls a reuseable workflow
+  autoRIFT:
+    needs: S2_search
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.S2_search.outputs.MATRIX) }}
+    name: ${{ matrix.name }}
+    uses: ./.github/workflows/image_correlation_pair.yml
+    with:
+      img1_product_name: ${{ matrix.img1_product_name }}
+      img2_product_name: ${{ matrix.img2_product_name }} 
+      workflow_name: ${{ matrix.name }}
+
+  summary_statistics:
+    needs: [S2_search, autoRIFT]
+    name: summary_statistics
+    uses: ./.github/workflows/summary_statistics.yml
