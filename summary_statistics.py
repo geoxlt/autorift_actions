@@ -26,9 +26,9 @@ def combine_ds(data_dir, file_type='horizontal_velocity'):
     datasets = []
     tif_list = glob(f'{data_dir}/S2*{file_type}.tif')
     for tif_path in tif_list:
-        dates = tif_list[0].split('/')[-1][3:20] #parse filename for dates
-        start_date = datetime.strptime(dates[:8], '%Y%m%d')
-        end_date = datetime.strptime(dates[-8:], '%Y%m%d')
+        dates = tif_path.split('/')[-1][3:24] #parse filename for dates
+        start_date = datetime.strptime(dates[:10], '%Y-%m-%d')
+        end_date = datetime.strptime(dates[11:], '%Y-%m-%d')
         t_baseline = end_date - start_date
         
         src = xr_read_geotif(tif_path, masked=False) #read product to xarray ds
