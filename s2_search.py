@@ -45,7 +45,7 @@ def main():
     # search planetary computer
     search = stac.search(
         intersects=aoi,
-        datetime="2017-01-01/2025-10-01",
+        datetime="2018-01-01/2030-10-01",
         collections=["sentinel-2-l2a"],
         query={"eo:cloud_cover": {"lt": float(args.cloud_cover)}})
 
